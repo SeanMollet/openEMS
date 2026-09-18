@@ -306,6 +306,7 @@ static const CUDA_ExtensionFactory CUDA_EXTENSIONS[] = {
 	CUDA_CreateExt_Excitation,
 	CUDA_CreateExt_UPML,
 	CUDA_CreateExt_Mur_ABC,
+	CUDA_CreateExt_LorentzMaterial,
 };
 
 GPU_Extension* GPU_Backend_CUDA::CreateExtension(Engine_Extension* eng_ext, Engine* eng)
