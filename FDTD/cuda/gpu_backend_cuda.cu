@@ -308,6 +308,7 @@ static const CUDA_ExtensionFactory CUDA_EXTENSIONS[] = {
 	CUDA_CreateExt_Mur_ABC,
 	CUDA_CreateExt_LorentzMaterial,
 	CUDA_CreateExt_LumpedRLC,
+	CUDA_CreateExt_TFSF,
 };
 
 GPU_Extension* GPU_Backend_CUDA::CreateExtension(Engine_Extension* eng_ext, Engine* eng)
