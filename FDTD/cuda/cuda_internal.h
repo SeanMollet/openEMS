@@ -119,5 +119,6 @@ void CUDA_Launch(GPU_Backend_CUDA::Impl* d, const char* name, Kernel kernel, siz
 //! Factory of a CUDA extension: the device implementation of \a eng_ext, or NULL if \a eng_ext is not of its type
 typedef GPU_Extension* (*CUDA_ExtensionFactory)(GPU_Backend_CUDA::Impl* d, Engine_Extension* eng_ext, Engine* eng);
 GPU_Extension* CUDA_CreateExt_Excitation(GPU_Backend_CUDA::Impl* d, Engine_Extension* eng_ext, Engine* eng);
+GPU_Extension* CUDA_CreateExt_UPML(GPU_Backend_CUDA::Impl* d, Engine_Extension* eng_ext, Engine* eng);
 
 #endif // CUDA_INTERNAL_H
