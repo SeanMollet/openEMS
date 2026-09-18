@@ -21,6 +21,7 @@ if(ENABLE_CUDA)
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/gpu_backend_cuda.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/cuda_ext_excitation.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/cuda_ext_upml.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/cuda/cuda_ext_mur_abc.cu
   )
 endif()
 
