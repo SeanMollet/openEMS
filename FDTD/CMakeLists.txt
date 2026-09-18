@@ -19,6 +19,7 @@ endif()
 if(ENABLE_CUDA)
   set(CUDA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/gpu_backend_cuda.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/cuda/cuda_ext_excitation.cu
   )
 endif()
 

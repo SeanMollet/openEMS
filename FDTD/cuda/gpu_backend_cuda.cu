@@ -303,7 +303,7 @@ void GPU_Backend_CUDA::Synchronize()
 
 // all CUDA extensions, see cuda_internal.h
 static const CUDA_ExtensionFactory CUDA_EXTENSIONS[] = {
-	NULL,
+	CUDA_CreateExt_Excitation,
 };
 
 GPU_Extension* GPU_Backend_CUDA::CreateExtension(Engine_Extension* eng_ext, Engine* eng)
