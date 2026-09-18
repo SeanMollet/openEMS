@@ -26,6 +26,7 @@ if(ENABLE_CUDA)
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/cuda_ext_lumpedRLC.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/cuda_ext_tfsf.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda/cuda_ext_absorbing_bc.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/cuda/cuda_ext_steadystate.cu
   )
 endif()
 
