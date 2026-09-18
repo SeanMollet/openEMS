@@ -19,8 +19,8 @@
 #define ENGINE_GPU_H
 
 #include "engine.h"
-#include "operator_gpu.h"
 
+#include <string>
 #include <vector>
 
 class GPU_Backend;
@@ -46,7 +46,8 @@ class GPU_Extension;
 class Engine_GPU : public Engine
 {
 public:
-	static Engine_GPU* New(const Operator_GPU* op);
+	//! Create the engine for \a op on the GPU backend \a backend (see GPU_Backend::New)
+	static Engine_GPU* New(const Operator* op, const std::string& backend);
 	virtual ~Engine_GPU();
 
 	virtual void Init();
@@ -61,8 +62,9 @@ public:
 	bool FieldsOnHost() const {return m_FieldsOnHost;}
 
 protected:
-	Engine_GPU(const Operator_GPU* op);
+	Engine_GPU(const Operator* op, const std::string& backend);
 
+	std::string m_BackendName;
 	GPU_Backend* m_Backend;
 	bool m_FieldsOnHost;
 

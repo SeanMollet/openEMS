@@ -11,7 +11,9 @@
  fused multiply-add), so it is compared with a tolerance instead.
 
  Together the cases use the excitation, UPML, Mur ABC, Lorentz material,
- lumped RLC, conducting sheet, TF/SF and steady-state extensions.
+ lumped RLC, conducting sheet, TF/SF, local absorber, steady-state and
+ cylinder extensions. For cylindrical meshes the engine choice 'basic' has no
+ effect, the CPU reference is the cylindrical (multithreaded) engine.
 
  Pass criteria (per case)
    the requested backend was created (not a silent fallback)
@@ -105,6 +107,196 @@ def case_3d_mixed():
     return FDTD, CSX
 
 
+def case_excitation():
+    """ PEC cavity: only the excitation extension, with overlapping sources """
+    FDTD = openEMS(NrTS=600, EndCriteria=0)
+    FDTD.SetGaussExcite(5.5e9, 4.5e9)
+    FDTD.SetBoundaryCond(['PEC'] * 6)
+    CSX = ContinuousStructure()
+    FDTD.SetCSX(CSX)
+    mesh = CSX.GetGrid()
+    mesh.SetDeltaUnit(unit)
+    for ax in 'xyz':
+        mesh.AddLine(ax, np.arange(-10, 10.5, 1))
+    CSX.AddExcitation('e_soft', exc_type=0, exc_val=[1, 0, 0]).AddBox([0, -2, 2], [4, 2, 2])
+    CSX.AddExcitation('e_soft2', exc_type=0, exc_val=[0.5, 0, 0], delay=0.1e-9).AddBox([2, 0, 2], [6, 0, 2])  # shares edges
+    CSX.AddExcitation('h_soft', exc_type=2, exc_val=[0, 0, 1]).AddBox([2, 2, -4], [4, 4, -2])
+    CSX.AddProbe('et', p_type=2).AddPoint([5, 5, 5])
+    CSX.AddProbe('ht', p_type=3).AddPoint([-5, 5, -5])
+    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([-10, -10, 0], [10, 10, 0])
+    return FDTD, CSX
+
+
+def case_pml():
+    """ free space with PML on all sides: excitation and UPML extensions """
+    FDTD = openEMS(NrTS=700, EndCriteria=0)
+    FDTD.SetGaussExcite(5.5e9, 4.5e9)
+    FDTD.SetBoundaryCond(['PML_8'] * 6)
+    CSX = ContinuousStructure()
+    FDTD.SetCSX(CSX)
+    mesh = CSX.GetGrid()
+    mesh.SetDeltaUnit(unit)
+    for ax in 'xyz':
+        mesh.AddLine(ax, np.arange(-15, 15.5, 1))
+    CSX.AddExcitation('dipole', exc_type=0, exc_val=[0, 0, 1]).AddBox([0, 0, -1], [0, 0, 1])
+    CSX.AddProbe('et', p_type=2).AddPoint([4, 3, 2])
+    CSX.AddProbe('ht', p_type=3).AddPoint([-3, 5, 0])
+    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([-15, -15, 0], [15, 15, 0])
+    return FDTD, CSX
+
+
+def case_mur():
+    """ free space with Mur ABC on all sides and a source on a boundary plane: excitation and Mur extensions """
+    FDTD = openEMS(NrTS=700, EndCriteria=0)
+    FDTD.SetGaussExcite(5.5e9, 4.5e9)
+    FDTD.SetBoundaryCond(['MUR'] * 6)
+    CSX = ContinuousStructure()
+    FDTD.SetCSX(CSX)
+    mesh = CSX.GetGrid()
+    mesh.SetDeltaUnit(unit)
+    for ax in 'xyz':
+        mesh.AddLine(ax, np.arange(-10, 10.5, 1))
+    CSX.AddExcitation('dipole', exc_type=0, exc_val=[0, 0, 1]).AddBox([0, 0, -1], [0, 0, 1])
+    # a source on the x-max plane delays that Mur ABC until the excitation is done
+    CSX.AddExcitation('wall', exc_type=0, exc_val=[0, 1, 0]).AddBox([10, -2, 0], [10, 2, 0])
+    CSX.AddProbe('et', p_type=2).AddPoint([4, 3, 2])
+    CSX.AddProbe('ht', p_type=3).AddPoint([-3, 5, 0])
+    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([-10, -10, 0], [10, 10, 0])
+    return FDTD, CSX
+
+
+def case_materials():
+    """ Drude, Lorentz and Debye materials, a magnetic Drude material and a conducting sheet in a PML channel """
+    FDTD = openEMS(NrTS=3000, EndCriteria=0)
+    CSX = ContinuousStructure()
+    FDTD.SetCSX(CSX)
+    CSX.GetGrid().SetDeltaUnit(unit)
+    channel_1d(FDTD, CSX)
+    def lorentz(name, z0, z1, **kw):
+        m = CSPropLorentzMaterial(CSX.GetParameterSet(), order=1)
+        m.SetName(name)
+        m.SetDispersiveMaterialProperty(0, **kw)
+        CSX.AddProperty(m)
+        m.AddBox([0, 0, z0], [1, 1, z1], priority=10)
+    lorentz('drude', 25, 30, eps_plasma=5e9, eps_relax=1e-9)
+    lorentz('lorentz', 32, 37, eps_plasma=4e9, eps_pole_freq=3e9, eps_relax=1e-9)
+    lorentz('double_drude', 39, 44, eps_plasma=5e9, eps_relax=1e-8, mue_plasma=5e9, mue_relax=1e-8)
+    debye = CSPropDebyeMaterial(CSX.GetParameterSet(), order=1, epsilon=4)
+    debye.SetName('debye')
+    debye.SetDispersiveMaterialProperty(0, eps_delta=1, eps_relax=4e-11)
+    CSX.AddProperty(debye)
+    debye.AddBox([0, 0, 46], [1, 1, 51], priority=10)
+    CSX.AddConductingSheet('sheet', conductivity=1e5, thickness=10e-6).AddBox([0, 0, 55], [1, 1, 55], priority=10)
+    return FDTD, CSX
+
+
+def case_lumped():
+    """ lumped port with series and parallel RLC elements in a Mur box: excitation, lumped RLC and Mur extensions """
+    FDTD = openEMS(NrTS=1500, EndCriteria=0)
+    FDTD.SetGaussExcite(5.5e9, 4.5e9)
+    FDTD.SetBoundaryCond(['MUR'] * 6)
+    CSX = ContinuousStructure()
+    FDTD.SetCSX(CSX)
+    mesh = CSX.GetGrid()
+    mesh.SetDeltaUnit(unit)
+    for ax in 'xyz':
+        mesh.AddLine(ax, np.arange(-10, 10.5, 1))
+    LumpedPort(CSX, 1, 50, [-4, 0, 0], [-4, 0, 2], 'z', excite=1)
+    ser = CSX.AddLumpedElement('ser_rlc', ny='z', caps=False, R=10, L=1e-9, C=1e-12, LEtype=1)
+    ser.AddBox([0, 0, 0], [0, 0, 2], priority=10)
+    par = CSX.AddLumpedElement('par_rlc', ny='z', caps=False, R=200, L=2e-9, C=0.5e-12, LEtype=0)
+    par.AddBox([4, 0, 0], [4, 0, 2], priority=10)
+    wire = CSX.AddMetal('wire')
+    wire.AddCurve([[-4, 4], [0, 0], [0, 0]])
+    wire.AddCurve([[-4, 4], [0, 0], [2, 2]])
+    CSX.AddProbe('et', p_type=2).AddPoint([0, 5, 0])
+    return FDTD, CSX
+
+
+def case_tfsf():
+    """ oblique plane wave on a PEC sphere in a PML box: excitation, TF/SF and UPML extensions """
+    FDTD = openEMS(NrTS=700, EndCriteria=0)
+    FDTD.SetGaussExcite(5.5e9, 4.5e9)
+    FDTD.SetBoundaryCond(['PML_8'] * 6)
+    CSX = ContinuousStructure()
+    FDTD.SetCSX(CSX)
+    mesh = CSX.GetGrid()
+    mesh.SetDeltaUnit(unit)
+    for ax in 'xyz':
+        mesh.AddLine(ax, np.arange(-15, 15.5, 1))
+    k_dir = np.array([1, 2, 3]) / np.sqrt(14)
+    pw = CSX.AddExcitation('plane_wave', exc_type=10, exc_val=[2, -1, 0])
+    pw.SetPropagationDir(k_dir)
+    pw.SetFrequency(5e9)
+    pw.AddBox([-6, -6, -6], [6, 6, 6])
+    CSX.AddMetal('sphere').AddSphere(priority=10, center=[0, 0, 0], radius=3)
+    CSX.AddProbe('et_in', p_type=2).AddPoint([4, -3, 2])
+    CSX.AddProbe('et_out', p_type=2).AddPoint([-10, 1, 3])
+    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([-15, -15, 0], [15, 15, 0])
+    return FDTD, CSX
+
+
+def case_absorbers():
+    """ PEC-terminated channel with local absorbing sheets (Mur and Mur with super-absorption) """
+    FDTD = openEMS(NrTS=3000, EndCriteria=0)
+    FDTD.SetGaussExcite(5.5e9, 4.5e9)
+    FDTD.SetBoundaryCond(['PEC', 'PEC', 'PMC', 'PMC', 'PEC', 'PEC'])
+    CSX = ContinuousStructure()
+    FDTD.SetCSX(CSX)
+    mesh = CSX.GetGrid()
+    mesh.SetDeltaUnit(unit)
+    mesh.AddLine('x', [0, 0.5, 1])
+    mesh.AddLine('y', [0, 0.5, 1])
+    mesh.AddLine('z', np.arange(0, 100.5, 0.5))
+    CSX.AddExcitation('plane', exc_type=0, exc_val=[1, 0, 0]).AddBox([0, 0, 40], [1, 1, 40])
+    CSX.AddAbsorbingBC('abs_low', NormalSignPositive=False, AbsorbingBoundaryType=ABCtype.MUR_1ST,
+                       PhaseVelocity=C0).AddBox([0, 0, 5], [1, 1, 5], priority=6)
+    CSX.AddAbsorbingBC('abs_high', NormalSignPositive=True, AbsorbingBoundaryType=ABCtype.MUR_1ST_SA,
+                       PhaseVelocity=C0).AddBox([0, 0, 95], [1, 1, 95], priority=6)
+    CSX.AddProbe('et', p_type=2).AddPoint([0.5, 0.5, 70])
+    CSX.AddProbe('ht', p_type=3).AddPoint([0.5, 0.5, 20])
+    return FDTD, CSX
+
+
+def cylinder_mesh(FDTD, alpha, r0, r1):
+    """ cylindrical mesh, the CPU reference is the cylindrical engine (engine='basic' has no effect) """
+    CSX = ContinuousStructure(CoordSystem=1)
+    FDTD.SetCSX(CSX)
+    mesh = CSX.GetGrid()
+    mesh.SetDeltaUnit(unit)
+    mesh.AddLine('r', np.arange(r0, r1 + 1, 2))
+    mesh.AddLine('a', alpha)
+    mesh.AddLine('z', np.arange(0, 30.5, 2))
+    return CSX
+
+
+def case_cylinder_closed():
+    """ closed cylindrical mesh including r=0: excitation and cylinder extensions """
+    FDTD = openEMS(CoordSystem=1, NrTS=1500, EndCriteria=0)
+    FDTD.SetGaussExcite(3e9, 2e9)
+    FDTD.SetBoundaryCond(['PEC'] * 6)
+    CSX = cylinder_mesh(FDTD, (np.arange(25) - 12) * 2*np.pi/24, 0, 40)
+    CSX.AddExcitation('line', exc_type=0, exc_val=[0, 0, 1]).AddBox([14, 0, 0], [14, 0, 30])
+    CSX.AddExcitation('radial', exc_type=0, exc_val=[1, 0, 0]).AddBox([6, np.pi/2, 10], [10, np.pi/2, 10])
+    CSX.AddProbe('et_axis', p_type=2).AddPoint([0, 0, 16])
+    CSX.AddProbe('et', p_type=2).AddPoint([20, np.pi/4, 14])
+    CSX.AddProbe('ht', p_type=3).AddPoint([10, -np.pi/3, 8])
+    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([0, -np.pi, 14], [40, np.pi, 14])
+    return FDTD, CSX
+
+
+def case_cylinder_wedge():
+    """ open alpha wedge with r>0 and PML in z: excitation, UPML and (inactive) cylinder extensions """
+    FDTD = openEMS(CoordSystem=1, NrTS=1000, EndCriteria=0)
+    FDTD.SetGaussExcite(3e9, 2e9)
+    FDTD.SetBoundaryCond(['PEC', 'PEC', 'PEC', 'PEC', 'PML_8', 'PML_8'])
+    CSX = cylinder_mesh(FDTD, np.linspace(-np.pi/4, np.pi/4, 13), 10, 40)
+    CSX.AddExcitation('coax', exc_type=0, exc_val=[1, 0, 0]).AddBox([10, -np.pi/4, 12], [40, np.pi/4, 12])
+    CSX.AddProbe('et', p_type=2).AddPoint([20, 0, 20])
+    CSX.AddProbe('ht', p_type=3).AddPoint([30, np.pi/8, 6])
+    return FDTD, CSX
+
+
 def case_steady_state():
     FDTD = openEMS(NrTS=100000, EndCriteria=1e-6)
     CSX = ContinuousStructure()
@@ -135,14 +327,15 @@ def run_captured(case, Sim_Path, engine):
         return log.read()
 
 
-def deviation(a, b):
-    """ max. deviation of b from a, relative to the peak of a (0 if identical) """
+def deviation(a, b, peak=None):
+    """ max. deviation of b from a, relative to peak (default: the peak of a), 0 if identical """
     a = np.asarray(a); b = np.asarray(b)
     if a.shape != b.shape:
         return np.inf
     if np.array_equal(a, b):
         return 0.0
-    peak = np.max(np.abs(a))
+    if peak is None:
+        peak = np.max(np.abs(a))
     return np.max(np.abs(a - b)) / (peak if peak > 0 else 1.0)
 
 
@@ -159,157 +352,18 @@ def compare_outputs(path_a, path_b, rtol=0):
         diff.append((f, deviation(a, b)))
     for f in dumps:
         with h5py.File(os.path.join(path_a, f), 'r') as a, h5py.File(os.path.join(path_b, f), 'r') as b:
-            def visit(name, obj):
-                if isinstance(obj, h5py.Dataset):
-                    diff.append((f'{f}:{name}', deviation(obj[()], b[name][()]) if name in b else np.inf))
-            a.visititems(visit)
+            names = []
+            a.visititems(lambda name, obj: names.append(name) if isinstance(obj, h5py.Dataset) else None)
+            # field data relative to the peak of the whole dump, not of each (possibly decayed) timestep
+            fields = [n for n in names if n.startswith('FieldData')]
+            peak = max([np.max(np.abs(a[n][()])) for n in fields] or [0])
+            for n in names:
+                if n not in b:
+                    diff.append((f'{f}:{n}', np.inf))
+                else:
+                    diff.append((f'{f}:{n}', deviation(a[n][()], b[n][()], peak if n in fields else None)))
     worst = max(d for _, d in diff)
     return [(n, d) for n, d in diff if d > rtol], len(probes), len(dumps), worst
-
-
-def case_excitation():
-    """ PEC cavity: only the excitation extension, with overlapping sources """
-    FDTD = openEMS(NrTS=600, EndCriteria=0)
-    FDTD.SetGaussExcite(5.5e9, 4.5e9)
-    FDTD.SetBoundaryCond(['PEC'] * 6)
-    CSX = ContinuousStructure()
-    FDTD.SetCSX(CSX)
-    mesh = CSX.GetGrid()
-    mesh.SetDeltaUnit(unit)
-    for ax in 'xyz':
-        mesh.AddLine(ax, np.arange(-10, 10.5, 1))
-    CSX.AddExcitation('e_soft', exc_type=0, exc_val=[1, 0, 0]).AddBox([0, -2, 2], [4, 2, 2])
-    CSX.AddExcitation('e_soft2', exc_type=0, exc_val=[0.5, 0, 0], delay=0.1e-9).AddBox([2, 0, 2], [6, 0, 2])  # shares edges
-    CSX.AddExcitation('h_soft', exc_type=2, exc_val=[0, 0, 1]).AddBox([2, 2, -4], [4, 4, -2])
-    CSX.AddProbe('et', p_type=2).AddPoint([5, 5, 5])
-    CSX.AddProbe('ht', p_type=3).AddPoint([-5, 5, -5])
-    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([-10, -10, 0], [10, 10, 0])
-    return FDTD, CSX
-
-def case_pml():
-    """ free space with PML on all sides: excitation and UPML extensions """
-    FDTD = openEMS(NrTS=700, EndCriteria=0)
-    FDTD.SetGaussExcite(5.5e9, 4.5e9)
-    FDTD.SetBoundaryCond(['PML_8'] * 6)
-    CSX = ContinuousStructure()
-    FDTD.SetCSX(CSX)
-    mesh = CSX.GetGrid()
-    mesh.SetDeltaUnit(unit)
-    for ax in 'xyz':
-        mesh.AddLine(ax, np.arange(-15, 15.5, 1))
-    CSX.AddExcitation('dipole', exc_type=0, exc_val=[0, 0, 1]).AddBox([0, 0, -1], [0, 0, 1])
-    CSX.AddProbe('et', p_type=2).AddPoint([4, 3, 2])
-    CSX.AddProbe('ht', p_type=3).AddPoint([-3, 5, 0])
-    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([-15, -15, 0], [15, 15, 0])
-    return FDTD, CSX
-
-def case_mur():
-    """ free space with Mur ABC on all sides and a source on a boundary plane: excitation and Mur extensions """
-    FDTD = openEMS(NrTS=700, EndCriteria=0)
-    FDTD.SetGaussExcite(5.5e9, 4.5e9)
-    FDTD.SetBoundaryCond(['MUR'] * 6)
-    CSX = ContinuousStructure()
-    FDTD.SetCSX(CSX)
-    mesh = CSX.GetGrid()
-    mesh.SetDeltaUnit(unit)
-    for ax in 'xyz':
-        mesh.AddLine(ax, np.arange(-10, 10.5, 1))
-    CSX.AddExcitation('dipole', exc_type=0, exc_val=[0, 0, 1]).AddBox([0, 0, -1], [0, 0, 1])
-    # a source on the x-max plane delays that Mur ABC until the excitation is done
-    CSX.AddExcitation('wall', exc_type=0, exc_val=[0, 1, 0]).AddBox([10, -2, 0], [10, 2, 0])
-    CSX.AddProbe('et', p_type=2).AddPoint([4, 3, 2])
-    CSX.AddProbe('ht', p_type=3).AddPoint([-3, 5, 0])
-    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([-10, -10, 0], [10, 10, 0])
-    return FDTD, CSX
-
-def case_materials():
-    """ Drude, Lorentz and Debye materials, a magnetic Drude material and a conducting sheet in a PML channel """
-    FDTD = openEMS(NrTS=3000, EndCriteria=0)
-    CSX = ContinuousStructure()
-    FDTD.SetCSX(CSX)
-    CSX.GetGrid().SetDeltaUnit(unit)
-    channel_1d(FDTD, CSX)
-    def lorentz(name, z0, z1, **kw):
-        m = CSPropLorentzMaterial(CSX.GetParameterSet(), order=1)
-        m.SetName(name)
-        m.SetDispersiveMaterialProperty(0, **kw)
-        CSX.AddProperty(m)
-        m.AddBox([0, 0, z0], [1, 1, z1], priority=10)
-    lorentz('drude', 25, 30, eps_plasma=5e9, eps_relax=1e-9)
-    lorentz('lorentz', 32, 37, eps_plasma=4e9, eps_pole_freq=3e9, eps_relax=1e-9)
-    lorentz('double_drude', 39, 44, eps_plasma=5e9, eps_relax=1e-8, mue_plasma=5e9, mue_relax=1e-8)
-    debye = CSPropDebyeMaterial(CSX.GetParameterSet(), order=1, epsilon=4)
-    debye.SetName('debye')
-    debye.SetDispersiveMaterialProperty(0, eps_delta=1, eps_relax=4e-11)
-    CSX.AddProperty(debye)
-    debye.AddBox([0, 0, 46], [1, 1, 51], priority=10)
-    CSX.AddConductingSheet('sheet', conductivity=1e5, thickness=10e-6).AddBox([0, 0, 55], [1, 1, 55], priority=10)
-    return FDTD, CSX
-
-def case_lumped():
-    """ lumped port with series and parallel RLC elements in a Mur box: excitation, lumped RLC and Mur extensions """
-    FDTD = openEMS(NrTS=1500, EndCriteria=0)
-    FDTD.SetGaussExcite(5.5e9, 4.5e9)
-    FDTD.SetBoundaryCond(['MUR'] * 6)
-    CSX = ContinuousStructure()
-    FDTD.SetCSX(CSX)
-    mesh = CSX.GetGrid()
-    mesh.SetDeltaUnit(unit)
-    for ax in 'xyz':
-        mesh.AddLine(ax, np.arange(-10, 10.5, 1))
-    LumpedPort(CSX, 1, 50, [-4, 0, 0], [-4, 0, 2], 'z', excite=1)
-    ser = CSX.AddLumpedElement('ser_rlc', ny='z', caps=False, R=10, L=1e-9, C=1e-12, LEtype=1)
-    ser.AddBox([0, 0, 0], [0, 0, 2], priority=10)
-    par = CSX.AddLumpedElement('par_rlc', ny='z', caps=False, R=200, L=2e-9, C=0.5e-12, LEtype=0)
-    par.AddBox([4, 0, 0], [4, 0, 2], priority=10)
-    wire = CSX.AddMetal('wire')
-    wire.AddCurve([[-4, 4], [0, 0], [0, 0]])
-    wire.AddCurve([[-4, 4], [0, 0], [2, 2]])
-    CSX.AddProbe('et', p_type=2).AddPoint([0, 5, 0])
-    return FDTD, CSX
-
-def case_tfsf():
-    """ oblique plane wave on a PEC sphere in a PML box: excitation, TF/SF and UPML extensions """
-    FDTD = openEMS(NrTS=700, EndCriteria=0)
-    FDTD.SetGaussExcite(5.5e9, 4.5e9)
-    FDTD.SetBoundaryCond(['PML_8'] * 6)
-    CSX = ContinuousStructure()
-    FDTD.SetCSX(CSX)
-    mesh = CSX.GetGrid()
-    mesh.SetDeltaUnit(unit)
-    for ax in 'xyz':
-        mesh.AddLine(ax, np.arange(-15, 15.5, 1))
-    k_dir = np.array([1, 2, 3]) / np.sqrt(14)
-    pw = CSX.AddExcitation('plane_wave', exc_type=10, exc_val=[2, -1, 0])
-    pw.SetPropagationDir(k_dir)
-    pw.SetFrequency(5e9)
-    pw.AddBox([-6, -6, -6], [6, 6, 6])
-    CSX.AddMetal('sphere').AddSphere(priority=10, center=[0, 0, 0], radius=3)
-    CSX.AddProbe('et_in', p_type=2).AddPoint([4, -3, 2])
-    CSX.AddProbe('et_out', p_type=2).AddPoint([-10, 1, 3])
-    CSX.AddDump('Et', dump_type=0, file_type=1).AddBox([-15, -15, 0], [15, 15, 0])
-    return FDTD, CSX
-
-def case_absorbers():
-    """ PEC-terminated channel with local absorbing sheets (Mur and Mur with super-absorption) """
-    FDTD = openEMS(NrTS=3000, EndCriteria=0)
-    FDTD.SetGaussExcite(5.5e9, 4.5e9)
-    FDTD.SetBoundaryCond(['PEC', 'PEC', 'PMC', 'PMC', 'PEC', 'PEC'])
-    CSX = ContinuousStructure()
-    FDTD.SetCSX(CSX)
-    mesh = CSX.GetGrid()
-    mesh.SetDeltaUnit(unit)
-    mesh.AddLine('x', [0, 0.5, 1])
-    mesh.AddLine('y', [0, 0.5, 1])
-    mesh.AddLine('z', np.arange(0, 100.5, 0.5))
-    CSX.AddExcitation('plane', exc_type=0, exc_val=[1, 0, 0]).AddBox([0, 0, 40], [1, 1, 40])
-    CSX.AddAbsorbingBC('abs_low', NormalSignPositive=False, AbsorbingBoundaryType=ABCtype.MUR_1ST,
-                       PhaseVelocity=C0).AddBox([0, 0, 5], [1, 1, 5], priority=6)
-    CSX.AddAbsorbingBC('abs_high', NormalSignPositive=True, AbsorbingBoundaryType=ABCtype.MUR_1ST_SA,
-                       PhaseVelocity=C0).AddBox([0, 0, 95], [1, 1, 95], priority=6)
-    CSX.AddProbe('et', p_type=2).AddPoint([0.5, 0.5, 70])
-    CSX.AddProbe('ht', p_type=3).AddPoint([0.5, 0.5, 20])
-    return FDTD, CSX
 
 
 def case_coax_resonator():
@@ -348,6 +402,7 @@ def case_coax_resonator():
     return FDTD, CSX
 
 
+# (name, case, all extensions have a Metal implementation)
 cases = [('excitation',     case_excitation),
          ('pml',            case_pml),
          ('mur',            case_mur),
@@ -355,6 +410,8 @@ cases = [('excitation',     case_excitation),
          ('lumped',         case_lumped),
          ('tfsf',           case_tfsf),
          ('absorbers',      case_absorbers),
+         ('cylinder_closed', case_cylinder_closed),
+         ('cylinder_wedge', case_cylinder_wedge),
          ('dispersive_pml', case_dispersive_pml),
          ('3d_mixed',       case_3d_mixed),
          ('steady_state',   case_steady_state),
@@ -375,6 +432,7 @@ for name, case in cases:
     diff, n_probes, n_dumps, _ = compare_outputs(paths['basic'], paths['gpu-reference'])
     print(f'  reference backend: compared {n_probes} probe files and {n_dumps} field dumps')
     assert not diff, f'FAIL [{name}]: reference backend differs from the basic engine in: {", ".join(n for n, _ in diff)}'
+
     print('PASS [{}]'.format(name))
 
 print('PASS')
