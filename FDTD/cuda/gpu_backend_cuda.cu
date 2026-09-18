@@ -311,6 +311,7 @@ static const CUDA_ExtensionFactory CUDA_EXTENSIONS[] = {
 	CUDA_CreateExt_TFSF,
 	CUDA_CreateExt_Absorbing_BC,
 	CUDA_CreateExt_SteadyState,
+	CUDA_CreateExt_Cylinder,
 };
 
 GPU_Extension* GPU_Backend_CUDA::CreateExtension(Engine_Extension* eng_ext, Engine* eng)
