@@ -1418,7 +1418,7 @@ void openEMS::RunFDTD()
 	// evaluate the energy end criteria once per Nyquist period, but at most every 100 timesteps
 	// (Dirac and step excitations have a Nyquist period of a single timestep)
 	if (Eng_Ext_SSD==NULL)
-		ProcField->SetProcessInterval(std::max(FDTD_Op->GetExcitationSignal()->GetNyquistNum(), 100u));
+		ProcField->SetProcessInterval((std::max)(FDTD_Op->GetExcitationSignal()->GetNyquistNum(), 100u));   // (): not the max macro of windows.h
 
 	//init processings
 	PA->InitAll();
