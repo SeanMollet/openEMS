@@ -322,6 +322,16 @@ void GPU_Backend_CUDA::UploadCurrents(const ArrayLib::ArrayNIJK<FDTD_FLOAT>& cur
 	d->Flush();
 }
 
+bool GPU_Backend_CUDA::DownloadRange(bool currents, size_t offset, size_t count, FDTD_FLOAT* dst)
+{
+	if (offset+count > 3*d->numCells)
+		return false;
+	const float* src = (currents ? d->curr : d->volt) + offset;
+	CUDA_Check(cudaMemcpyAsync(dst, src, count*sizeof(float), cudaMemcpyDeviceToHost, d->Stream()), "range download");
+	d->Flush();
+	return true;
+}
+
 void GPU_Backend_CUDA::Synchronize()
 {
 	d->Flush();
