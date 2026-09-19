@@ -38,6 +38,7 @@
 #include "FDTD/extensions/engine_ext_steadystate.h"
 #include "FDTD/engine_interface_fdtd.h"
 #include "FDTD/engine_interface_cylindrical_fdtd.h"
+#include "FDTD/engine_interface_gpu_fdtd.h"
 #include "Common/processvoltage.h"
 #include "Common/processcurrent.h"
 #include "Common/processfieldprobe.h"
@@ -494,6 +495,9 @@ Engine_Interface_FDTD* openEMS::NewEngineInterface(int multigridlevel)
 	Operator_Cylinder* op_cyl = dynamic_cast<Operator_Cylinder*>(FDTD_Op);
 	if (op_cyl)
 		return new Engine_Interface_Cylindrical_FDTD(op_cyl);
+	Operator_GPU* op_gpu = dynamic_cast<Operator_GPU*>(FDTD_Op);
+	if (op_gpu)
+		return new Engine_Interface_GPU_FDTD(op_gpu);
 	Operator_sse* op_sse = dynamic_cast<Operator_sse*>(FDTD_Op);
 	if (op_sse)
 		return new Engine_Interface_SSE_FDTD(op_sse);
