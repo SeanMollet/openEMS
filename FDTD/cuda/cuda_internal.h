@@ -66,6 +66,9 @@ struct GPU_Backend_CUDA::Impl
 	size_t numCells;    //!< nx*ny*nz, the field buffers hold 3*numCells values
 
 	float *volt, *curr;
+	float2* energy;                      //!< per-line energy sums, see GPU_Backend_CUDA::CalcFastEnergy()
+	size_t energy_count;
+	std::vector<float2> energy_host;
 	float *vv, *vi, *ii, *iv;
 
 	Impl();
