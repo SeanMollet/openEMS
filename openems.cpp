@@ -583,6 +583,7 @@ bool openEMS::SetupProcessing()
 				proc->SetProcessInterval(Nyquist/m_OverSampling);
 				if (pb->GetStartTime()>0 || pb->GetStopTime()>0)
 					proc->SetProcessStartStopTime(pb->GetStartTime(), pb->GetStopTime());
+				proc->SetFDOverSampling(m_OverSampling);
 				proc->AddFrequency(pb->GetFDSamples());
 				proc->GetNormalDir(pb->GetNormalDir());
 				if (l_MultiBox==false)
@@ -654,6 +655,7 @@ bool openEMS::SetupProcessing()
 						}
 						if (db->GetDumpType()>=10)
 						{
+							ProcField->SetFDOverSampling(m_OverSampling);
 							ProcField->AddFrequency(db->GetFDSamples());
 							ProcField->SetDumpType((ProcessFields::DumpType)(db->GetDumpType()-10));
 						}
