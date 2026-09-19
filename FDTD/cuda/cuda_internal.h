@@ -141,7 +141,7 @@ struct GPU_Backend_CUDA::Impl
 	//! No UPML regions updated by the main kernels (call after changing main_start/main_stop)
 	void ResetZSlabs();
 	//! Nodes [B, E) of the main kernels: main_start/main_stop and the UPML regions along z they update
-	void MainRange(CUDA_GridDim& B, CUDA_GridDim& E) const;
+	void MainRange(CUDA_GridDim& B, CUDA_GridDim& E, unsigned int& threads_z);
 
 	//! Wait until all work on the stream is done
 	void Flush();
@@ -162,14 +162,28 @@ protected:
 };
 
 //! Launch \a kernel with one thread per (i,j,k) on the stream of \a d; the kernel checks its bounds
+//! Kernel timing for development (environment variable OPENEMS_CUDA_KERNEL_TIMES=1): the
+//! time of every launch, per kernel name, printed at exit. Waits for each kernel.
+struct CUDA_KernelTimes
+{
+	static bool Enabled();
+	static void Begin(cudaStream_t stream);
+	static void End(cudaStream_t stream, const char* name);
+};
+
 template <typename Kernel, typename... Args>
 void CUDA_Launch(GPU_Backend_CUDA::Impl* d, const char* name, Kernel kernel, size_t ni, size_t nj, size_t nk, Args... args)
 {
 	if (ni==0 || nj==0 || nk==0)
 		return;
 	dim3 block = GPU_Backend_CUDA::Impl::Block(ni, nj);
+	const bool timed = CUDA_KernelTimes::Enabled();
+	if (timed)
+		CUDA_KernelTimes::Begin(d->Stream());
 	kernel<<<GPU_Backend_CUDA::Impl::Grid(block, ni, nj, nk), block, 0, d->Stream()>>>(args...);
 	d->CheckLaunch(name);
+	if (timed)
+		CUDA_KernelTimes::End(d->Stream(), name);
 }
 
 //! Factory of a CUDA extension: the device implementation of \a eng_ext, or NULL if \a eng_ext is not of its type
