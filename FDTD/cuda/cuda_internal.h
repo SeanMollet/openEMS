@@ -73,6 +73,7 @@ struct CUDA_Context
 {
 	int device;
 	cudaStream_t stream;
+	cudaStream_t copy_stream;   //!< downloads of field snapshots, overlapping the work (see GPU_Backend_CUDA::SnapshotFields())
 	std::string name;
 
 	CUDA_Context();
@@ -117,6 +118,18 @@ struct GPU_Backend_CUDA::Impl
 	unsigned int fixup_count;
 	//! Decide once whether the fused step is used, and prepare it
 	bool DecideFusedStep();
+
+	//! Field snapshots (see GPU_Backend_CUDA::SnapshotFields()): the dumped values, evaluated on the device
+	//! (gather_dumps) and downloaded on the copy stream into one of two page-locked host slots while the
+	//! next timesteps run
+	GPU_GatherEntry* snap_entries;   //!< the entries of the voltages, then of the currents
+	unsigned int snap_nv, snap_n;     //!< number of voltage entries, of all entries
+	float* snap_dev;                  //!< the values of the entries
+	float* snap_host[2];              //!< the values of the entries, for each slot
+	cudaEvent_t snap_evaluated;       //!< snap_dev is written
+	cudaEvent_t snap_done[2];         //!< the download into each slot is done
+	int snap_last;                    //!< slot of the last download from snap_dev, -1: none
+	void FreeSnapshots();
 
 	Impl();
 	~Impl();
