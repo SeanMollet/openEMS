@@ -112,6 +112,7 @@ struct GPU_Backend_CUDA::Impl
 	int fused_blockers;                      //!< extensions or grids that do not allow it
 	float *volt_next, *curr_next;
 	std::vector<unsigned int> volt_modified; //!< flat indices of voltages changed between the half-steps (e.g. excitation)
+	CUDA_FusedRegions fregions;              //!< the UPML regions in the kernel (see CUDA_Ext_UPML::CanFuse())
 	unsigned int* fixup;                     //!< main nodes whose currents are recomputed after the voltage extensions
 	unsigned int fixup_count;
 	//! Decide once whether the fused step is used, and prepare it
