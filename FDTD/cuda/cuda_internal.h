@@ -63,6 +63,8 @@ __device__ __forceinline__ CUDA_MainCoeff main_coeff(const void* index, const fl
 	return c;
 }
 
+#include "cuda_upml.cuh"
+
 //! Throw a std::runtime_error if \a err is an error
 void CUDA_Check(cudaError_t err, const char* what);
 
@@ -100,6 +102,9 @@ struct GPU_Backend_CUDA::Impl
 	//! UPML extensions of this grid and whether they run fused with the main updates (-1: not decided yet), see cuda_ext_upml.cu
 	std::vector<GPU_Extension*> upml;
 	int upml_fused;
+	//! UPML regions along z updated by the main kernels (nodes below main_start.nz / above main_stop.nz)
+	CUDA_ZSlabs zslabs;
+	bool zslab_lo, zslab_hi;
 
 	Impl();
 	~Impl();
@@ -132,6 +137,11 @@ struct GPU_Backend_CUDA::Impl
 		}
 		return Alloc<unsigned int>(sets.index.size(), sets.index.data());
 	}
+
+	//! No UPML regions updated by the main kernels (call after changing main_start/main_stop)
+	void ResetZSlabs();
+	//! Nodes [B, E) of the main kernels: main_start/main_stop and the UPML regions along z they update
+	void MainRange(CUDA_GridDim& B, CUDA_GridDim& E) const;
 
 	//! Wait until all work on the stream is done
 	void Flush();
