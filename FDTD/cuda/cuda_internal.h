@@ -80,10 +80,12 @@ struct GPU_Backend_CUDA::Impl
 		T* ptr = NULL;
 		CUDA_Check(cudaMalloc(&ptr, std::max(count, (size_t)1)*sizeof(T)), "cudaMalloc");
 		m_Allocations.push_back(ptr);
+		// on the work stream: it does not synchronize with the legacy default stream
 		if (host && count)
-			CUDA_Check(cudaMemcpy(ptr, host, count*sizeof(T), cudaMemcpyHostToDevice), "cudaMemcpy");
+			CUDA_Check(cudaMemcpyAsync(ptr, host, count*sizeof(T), cudaMemcpyHostToDevice, Stream()), "cudaMemcpy");
 		else
-			CUDA_Check(cudaMemset(ptr, 0, std::max(count, (size_t)1)*sizeof(T)), "cudaMemset");
+			CUDA_Check(cudaMemsetAsync(ptr, 0, std::max(count, (size_t)1)*sizeof(T), Stream()), "cudaMemset");
+		Flush();
 		return ptr;
 	}
 

@@ -326,10 +326,3 @@ GPU_Extension* GPU_Backend_CUDA::CreateExtension(Engine_Extension* eng_ext, Engi
 	}
 	return NULL;
 }
-
-GPU_MultiGridLink* GPU_Backend_CUDA::CreateMultiGridLink(GPU_Backend* sub_grid, const GPU_MultiGridInterpolation& interpol)
-{
-	UNUSED(sub_grid);
-	UNUSED(interpol);
-	return NULL;
-}
