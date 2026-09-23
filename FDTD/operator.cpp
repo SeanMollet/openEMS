@@ -17,6 +17,8 @@
 
 #include <fstream>
 #include <algorithm>
+#include <chrono>
+#include <cstdlib>
 #include <stdexcept>
 #include "operator.h"
 #include "engine.h"
@@ -41,6 +43,30 @@ using std::cout;
 using std::cerr;
 using std::endl;
 using std::flush;
+
+namespace
+{
+class SetupPhaseTimer
+{
+public:
+	SetupPhaseTimer() : enabled(getenv("OPENEMS_SETUP_TIMES") && atoi(getenv("OPENEMS_SETUP_TIMES"))!=0),
+	                    start(std::chrono::steady_clock::now()) {}
+
+	void Mark(const char* name)
+	{
+		if (!enabled)
+			return;
+		const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		cout << "OPENEMS_SETUP_TIME " << name << " "
+		     << std::chrono::duration<double>(now-start).count() << " s" << endl;
+		start = now;
+	}
+
+private:
+	bool enabled;
+	std::chrono::steady_clock::time_point start;
+};
+}
 
 Operator* Operator::New()
 {
@@ -956,7 +982,11 @@ void Operator::SetExcitationSignal(Excitation* exc)
 
 void Operator::Calc_ECOperatorPos(int n, unsigned int* pos)
 {
-	unsigned int i = MainOp->SetPos(pos[0],pos[1],pos[2]);
+	Calc_ECOperatorPosIndex(n, pos, MainOp->SetPos(pos[0],pos[1],pos[2]));
+}
+
+void Operator::Calc_ECOperatorPosIndex(int n, const unsigned int* pos, unsigned int i)
+{
 	double C = EC_C[n][i];
 	double G = EC_G[n][i];
 	if (C>0)
@@ -984,13 +1014,39 @@ void Operator::Calc_ECOperatorPos(int n, unsigned int* pos)
 	}
 }
 
+void Operator::CalcUpdateCoefficientsRange(unsigned int startX, unsigned int stopX)
+{
+	AdrOp address(MainOp);
+	unsigned int pos[3];
+	for (int n=0; n<3; ++n)
+	{
+		for (pos[0]=startX; pos[0]<=stopX; ++pos[0])
+			for (pos[1]=0; pos[1]<numLines[1]; ++pos[1])
+				for (pos[2]=0; pos[2]<numLines[2]; ++pos[2])
+					Calc_ECOperatorPosIndex(n, pos, address.SetPos(pos[0],pos[1],pos[2]));
+	}
+}
+
+void Operator::CalcUpdateCoefficients()
+{
+	unsigned int pos[3];
+	for (int n=0; n<3; ++n)
+		for (pos[0]=0; pos[0]<numLines[0]; ++pos[0])
+			for (pos[1]=0; pos[1]<numLines[1]; ++pos[1])
+				for (pos[2]=0; pos[2]<numLines[2]; ++pos[2])
+					Calc_ECOperatorPos(n,pos);
+}
+
 int Operator::CalcECOperator( DebugFlags debugFlags )
 {
+	SetupPhaseTimer setup_timer;
 	Init_EC();
 	InitDataStorage();
+	setup_timer.Mark("allocate");
 
 	if (Calc_EC()==0)
 		return -1;
+	setup_timer.Mark("geometry");
 
 	m_InvaildTimestep = false;
 	opt_dT = 0;
@@ -1009,6 +1065,7 @@ int Operator::CalcECOperator( DebugFlags debugFlags )
 	}
 	else
 		CalcTimestep();
+	setup_timer.Mark("timestep");
 
 	dT*=m_TimeStepFactor;
 
@@ -1023,22 +1080,10 @@ int Operator::CalcECOperator( DebugFlags debugFlags )
 	m_Exc->Reset(dT);
 
 	InitOperator();
+	setup_timer.Mark("coefficient_allocate");
 
-	unsigned int pos[3];
-
-	for (int n=0; n<3; ++n)
-	{
-		for (pos[0]=0; pos[0]<numLines[0]; ++pos[0])
-		{
-			for (pos[1]=0; pos[1]<numLines[1]; ++pos[1])
-			{
-				for (pos[2]=0; pos[2]<numLines[2]; ++pos[2])
-				{
-					Calc_ECOperatorPos(n,pos);
-				}
-			}
-		}
-	}
+	CalcUpdateCoefficients();
+	setup_timer.Mark("coefficient_convert");
 
 	//Apply PEC to all boundary's
 	bool PEC[6]={1,1,1,1,1,1};
@@ -1056,11 +1101,13 @@ int Operator::CalcECOperator( DebugFlags debugFlags )
 	for (int n=0; n<6; ++n)
 		PMC[n] = m_BC[n]==1;
 	ApplyMagneticBC(PMC);
+	setup_timer.Mark("boundaries");
 
 	//all information available for extension... create now...
 	for (size_t n=0; n<m_Op_exts.size(); ++n)
 		if (m_Op_exts.at(n)->BuildExtension()==false)
 			m_Op_exts.at(n)->SetActive(false); //extension has nothing to do or failed to build, drop it below
+	setup_timer.Mark("extensions");
 
 	//remove inactive extensions
 	std::vector<Operator_Extension*>::iterator it = m_Op_exts.begin();
@@ -1094,6 +1141,7 @@ int Operator::CalcECOperator( DebugFlags debugFlags )
 		delete[] EC_R[n];
 		EC_R[n]=NULL;
 	}
+	setup_timer.Mark("cleanup");
 
 	return 0;
 }

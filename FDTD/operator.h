@@ -247,6 +247,8 @@ protected:
 	virtual void Reset();
 	virtual void InitOperator();
 	virtual void InitDataStorage();
+	virtual void CalcUpdateCoefficients();
+	void CalcUpdateCoefficientsRange(unsigned int startX, unsigned int stopX);
 
 	virtual bool SetupCSXGrid(CSRectGrid* grid);
 
@@ -323,6 +325,7 @@ protected:
 
 	//! Calc operator at certain \a pos
 	virtual void Calc_ECOperatorPos(int n, unsigned int* pos);
+	void Calc_ECOperatorPosIndex(int n, const unsigned int* pos, unsigned int index);
 
 	//! Calculate and setup lumped elements
 	virtual bool Calc_LumpedElements();
