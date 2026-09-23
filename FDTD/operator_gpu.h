@@ -49,9 +49,10 @@ protected:
 	//! use New() for creating a new Operator
 	Operator_GPU(const std::string& backend);
 
-	//! Calc_EC_Range() and CalcPEC_Range() over x line ranges in parallel
+	//! Expensive independent x-line build steps run in parallel
 	virtual bool Calc_EC();
 	virtual bool CalcPEC();
+	virtual void CalcUpdateCoefficients();
 
 	//! x line ranges of the threads, at most one per available CPU, bounds inclusive
 	void ThreadRanges(std::vector<unsigned int>& start, std::vector<unsigned int>& stop) const;

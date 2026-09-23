@@ -16,6 +16,7 @@
 */
 
 #include <thread>
+#include <cstdlib>
 
 #include "engine_gpu.h"
 #include "operator_gpu.h"
@@ -100,4 +101,21 @@ bool Operator_GPU::CalcPEC()
 	}
 	CalcPEC_Curves();
 	return true;
+}
+
+void Operator_GPU::CalcUpdateCoefficients()
+{
+	if (getenv("OPENEMS_GPU_PARALLEL_COEFF") && atoi(getenv("OPENEMS_GPU_PARALLEL_COEFF"))==0)
+	{
+		Operator::CalcUpdateCoefficients();
+		return;
+	}
+	std::vector<unsigned int> start, stop;
+	ThreadRanges(start, stop);
+	std::vector<std::thread> threads;
+	for (size_t n=0; n<start.size(); ++n)
+		threads.push_back(std::thread(&Operator_GPU::CalcUpdateCoefficientsRange, this, start[n], stop[n]));
+	for (size_t n=0; n<threads.size(); ++n)
+		threads[n].join();
+	MainOp->SetPos(numLines[0]-1, numLines[1]-1, numLines[2]-1);
 }
