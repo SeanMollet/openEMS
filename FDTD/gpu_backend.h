@@ -92,6 +92,26 @@ public:
 	virtual void InterpolateToBase() = 0;
 };
 
+//! One component of a dumped node: the (interpolated) E or H field from up to four voltages or currents
+/*!
+  idx[k] indexes the voltages or currents in the flat ArrayNIJK layout,
+  ((n*numLines[0] + x)*numLines[1] + y)*numLines[2] + z.
+  raw(k) = field[idx[k]] / delta[k] (0 if delta[k] is 0), and the value is
+  - ZERO: 0
+  - RAW: raw(0)
+  - LERP: raw(0)*(1-rel) + raw(1)*rel
+  - AVG4: (raw(0) + raw(1) + raw(2) + raw(3)) / 4
+  in double precision, rounded to float. See Engine_Interface_FDTD::CreateFieldGather().
+  */
+struct GPU_GatherEntry
+{
+	enum Form { ZERO, RAW, LERP, AVG4 };
+	unsigned int form;
+	unsigned int idx[4];
+	double delta[4];
+	double rel;
+};
+
 //! Abstract interface to the device used by Engine_GPU
 /*!
   A backend owns the device memory: the voltage and current fields and the update
@@ -105,7 +125,8 @@ public:
 
   Init() is called once and before everything else; the rest may follow in any
   order, except where a method says otherwise. The device work of all calls is
-  queued in the order they are made and all of them run on the engine thread.
+  queued in the order they are made and all of them run on the engine thread,
+  only WaitSnapshot() may be called from another thread.
 
   The backend outlives everything it creates (sub-grid backend, device
   extensions, multi-grid link), and the caller frees those first.
@@ -149,6 +170,23 @@ public:
 	virtual FDTD_FLOAT* GetSharedCurrents() const {return NULL;}
 	//! Wait until the device finished all work, required before the host accesses shared memory
 	virtual void Synchronize() {}
+
+	//! Copy the current fields into snapshot \a slot (0 or 1) and return host pointers to them (ArrayNIJK layout), valid until the next snapshot into the same slot. Returns false if the backend cannot.
+	/*!
+	  The copy may still run on the device: WaitSnapshot() before reading it.
+	  */
+	virtual bool SnapshotFields(unsigned int slot, const FDTD_FLOAT* &volt, const FDTD_FLOAT* &curr) {UNUSED(slot); UNUSED(volt); UNUSED(curr); return false;}
+	//! Wait until the copy of snapshot \a slot is done, may be called from another thread
+	virtual void WaitSnapshot(unsigned int slot) {UNUSED(slot);}
+	//! Whether the snapshots can evaluate the dumped nodes on the device, see SetSnapshotGather()
+	virtual bool CanSnapshotGather() const {return false;}
+	//! Snapshots evaluate these dump entries instead of copying the fields
+	/*!
+	  SnapshotFields() then returns the values of \a volt_entries (from the voltages) in \a volt
+	  and of \a curr_entries (from the currents) in \a curr, in the order of the entries.
+	  Called before the first snapshot. Returns false if the backend cannot (no snapshots then).
+	  */
+	virtual bool SetSnapshotGather(const std::vector<GPU_GatherEntry>& volt_entries, const std::vector<GPU_GatherEntry>& curr_entries) {UNUSED(volt_entries); UNUSED(curr_entries); return false;}
 
 	//! Sums of the squared voltages and currents of the first numNodes[n] nodes in each direction, see Engine_Interface_FDTD::CalcFastEnergy(). Returns false if the backend cannot compute them.
 	virtual bool CalcFastEnergy(const unsigned int numNodes[3], double& E_energy, double& H_energy) {UNUSED(numNodes); UNUSED(E_energy); UNUSED(H_energy); return false;}
