@@ -20,6 +20,9 @@
 
 #include "gpu_backend.h"
 #include "gpu_backend_reference.h"
+#ifdef OPENEMS_WITH_HIP
+#include "hip/gpu_backend_hip.h"
+#endif
 #include "engine.h"
 #include "extensions/engine_ext_upml.h"
 #include "extensions/engine_ext_steadystate.h"
@@ -30,6 +33,12 @@ GPU_Backend* GPU_Backend::New(const std::string& name)
 		return new GPU_Backend_Reference();
 	if (name!="auto")
 		std::cerr << "GPU_Backend::New: Warning: unknown GPU backend \"" << name << "\", using the best available" << std::endl;
+#ifdef OPENEMS_WITH_HIP
+	GPU_Backend* hip = GPU_Backend_HIP::New();
+	if (hip)
+		return hip;
+	std::cerr << "GPU_Backend::New: Warning: no HIP device found" << std::endl;
+#endif
 	std::cerr << "GPU_Backend::New: Warning: no GPU backend available, using the reference backend on the CPU" << std::endl;
 	return new GPU_Backend_Reference();
 }

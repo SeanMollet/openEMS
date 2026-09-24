@@ -517,7 +517,7 @@ cases = [('excitation',     case_excitation,     True),
 
 DEVICE_RTOL = 1e-4
 # device backends with a device implementation of every extension
-FULL_DEVICE_BACKENDS = ()
+FULL_DEVICE_BACKENDS = ('HIP',)
 # device backends that accumulate the frequency domain dumps
 DEVICE_DFT_BACKENDS = ()
 engines = ('basic', 'gpu-reference', 'gpu')
