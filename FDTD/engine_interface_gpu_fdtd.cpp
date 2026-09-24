@@ -28,6 +28,13 @@ Engine_Interface_GPU_FDTD::~Engine_Interface_GPU_FDTD()
 	m_Eng_GPU = NULL;
 }
 
+void Engine_Interface_GPU_FDTD::PrepareFieldAccess()
+{
+	// several threads read the fields next; reading them from the device one by one is not thread-safe
+	if (m_Eng_GPU)
+		m_Eng_GPU->UpdateHostMirror();
+}
+
 namespace
 {
 //! Precomputed GetRawInterpolatedField()/GetRawInterpolatedDualField() (type 0) of the
