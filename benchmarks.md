@@ -7,7 +7,7 @@ AI disclosure: measured and written up with Claude Opus 5 (Claude Code).
 
 ## Tests
 
-**Horn antenna, time-domain NF2FF**: `python/Tests/Horn_Antenna_Benchmark.py td`,
+**Horn antenna, time-domain NF2FF**: `benchmarks/Horn_Antenna_Benchmark.py td`,
 the horn antenna tutorial by Thorsten Liebig (`python/Tutorials/Horn_Antenna.py`)
 with its post-processing (port, far field at 15 GHz, plots), without the geometry
 viewer. It evaluates the end criteria on a fixed schedule (`exact_endcriteria`),
@@ -23,13 +23,13 @@ so that every machine stops at the same timestep and the times compare.
 NF2FF box is created with `frequency=[f0]`: it records the 15 GHz fields during
 the run instead of dumping the time-domain fields. Same stop timestep and result.
 
-**Free space**: `python/Tests/FreeSpace_Benchmark.py`, the field updates alone.
+**Free space**: `benchmarks/FreeSpace_Benchmark.py`, the field updates alone.
 
 - 300 x 300 x 300 = 27 million cells, uniform mesh,
 - a soft dipole in the center, one probe, 800 timesteps, no dumps,
 - PML_8 on all sides, or PEC walls instead.
 
-**Coaxial cavity**: `python/Tests/Coaxial_Resonator.py`, a small model over a long
+**Coaxial cavity**: `benchmarks/Coaxial_Resonator.py`, a small model over a long
 run. The other tests are large grids over a few hundred or a few thousand
 timesteps, so they measure memory bandwidth; this one fits in cache and measures
 what a timestep costs when there is nothing to hide the per-step overhead behind.
