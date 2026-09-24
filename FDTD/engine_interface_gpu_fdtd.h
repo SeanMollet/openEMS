@@ -38,6 +38,7 @@ public:
 	Engine_Interface_GPU_FDTD(Operator_GPU* op);
 	virtual ~Engine_Interface_GPU_FDTD();
 
+	virtual double CalcFastEnergy() const;
 	virtual void PrepareFieldAccess();
 	virtual Engine_Field_Gather* CreateFieldGather(bool h_field, const unsigned int numLines[3], unsigned int* const posLines[3]) const;
 
