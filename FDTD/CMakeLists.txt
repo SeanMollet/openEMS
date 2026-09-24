@@ -1,5 +1,23 @@
+# Metal GPU backend (Objective-C++)
+if(APPLE AND ENABLE_METAL)
+  set(METAL_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/gpu_backend_metal.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_excitation.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_upml.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_mur_abc.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_lorentzmaterial.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_lumpedRLC.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_tfsf.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_absorbing_bc.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_steadystate.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_ext_cylinder.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/metal/metal_multigrid.mm
+  )
+endif()
+
 set(SOURCES
   ${SOURCES}
+  ${METAL_SOURCES}
   ${CMAKE_CURRENT_SOURCE_DIR}/engine.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/operator.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/engine_multithread.cpp

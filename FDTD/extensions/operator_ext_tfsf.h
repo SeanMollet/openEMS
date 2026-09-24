@@ -27,6 +27,7 @@ class Excitation;
 class Operator_Ext_TFSF : public Operator_Extension
 {
 	friend class Engine_Ext_TFSF;
+	friend class Metal_Ext_TFSF;
 public:
 	Operator_Ext_TFSF(Operator* op);
 	~Operator_Ext_TFSF();

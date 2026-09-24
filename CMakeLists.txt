@@ -175,6 +175,18 @@ set(SOURCES
 
 set(PUB_HEADERS openems.h openems_global.h)
 
+# Metal GPU backend for the GPU engine (--engine=gpu), macOS only
+IF(APPLE)
+  OPTION(ENABLE_METAL "Build the Metal GPU backend" ON)
+ENDIF()
+IF(APPLE AND ENABLE_METAL)
+  message(STATUS "Metal GPU backend enabled")
+  enable_language(OBJCXX)
+  set(CMAKE_OBJCXX_STANDARD ${CMAKE_CXX_STANDARD})
+  set(CMAKE_OBJCXX_FLAGS "${CMAKE_OBJCXX_FLAGS} -fobjc-arc")
+  ADD_DEFINITIONS( -DOPENEMS_WITH_METAL )
+ENDIF()
+
 # libs
 ADD_SUBDIRECTORY( tools )
 ADD_SUBDIRECTORY( FDTD )
@@ -187,6 +199,10 @@ message(STATUS "Sources:"  ${SOURCES})
 
 add_library( openEMS SHARED ${SOURCES})
 #ADD_EXECUTABLE( openEMS main.cpp ${SOURCES})
+IF(APPLE AND ENABLE_METAL)
+  TARGET_LINK_LIBRARIES( openEMS "-framework Metal" "-framework Foundation" )
+ENDIF()
+
 set_target_properties(openEMS PROPERTIES VERSION ${LIB_VERSION_STRING} SOVERSION ${LIB_VERSION_MAJOR} )
 TARGET_LINK_LIBRARIES( openEMS
   ${CSXCAD_LIBRARIES}
